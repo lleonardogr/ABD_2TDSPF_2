@@ -1,6 +1,9 @@
+using System.Threading.RateLimiting;
+using CardGameManagement.Api.Configuration;
 using CardGameManagement.Api.Configuration.Routes;
 using CardGameManagement.Data;
 using CardGameManagement.Domain.Entities;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
@@ -11,6 +14,25 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<CardGameMetadataDbContext>(options =>
 {
     options.UseOracle(builder.Configuration.GetConnectionString("FiapOracleConnection"));
+});
+
+builder.Services.Configure<CardGameRateLimitOptions>(
+    builder.Configuration.GetSection(CardGameRateLimitOptions.CardGameRateLimit));
+
+var rateLimitOptions = new CardGameRateLimitOptions();
+builder.Configuration.GetSection(CardGameRateLimitOptions.CardGameRateLimit).Bind(rateLimitOptions);
+var slidingPolicy = "sliding";
+
+
+builder.Services.AddRateLimiter(options => {
+    options.AddSlidingWindowLimiter(slidingPolicy, op =>
+    {
+        op.PermitLimit = rateLimitOptions.PermitLimit;
+        op.Window = TimeSpan.FromSeconds(rateLimitOptions.Window);
+        op.SegmentsPerWindow = rateLimitOptions.SegmentsPerWindow;
+        op.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        op.QueueLimit = rateLimitOptions.QueueLimit;
+    });
 });
 
 builder.Services.AddEndpointsApiExplorer();
@@ -38,6 +60,8 @@ builder.Services.AddSwaggerGen(options =>
 // o app é a aplicação em si, ele compila o builder, define o ambiente e as rotas
 var app = builder.Build();
 
+app.UseRateLimiter();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -47,7 +71,7 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.MapGet("/", () => "Hello World!").ExcludeFromDescription();
+app.MapGet("/test", () => "Hello World!").RequireRateLimiting(slidingPolicy);//.ExcludeFromDescription();
 app.MapCardEndpoints();
 
 app.MapGet("/Set", async (CardGameMetadataDbContext dbContext) =>
