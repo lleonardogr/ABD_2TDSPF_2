@@ -1,5 +1,6 @@
 namespace CardGameManagement.Api.Models;
 
+[Serializable]
 public record CardAddOrUpdateModel()
 {
     public string? Name { get; init; }

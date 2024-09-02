@@ -3,6 +3,9 @@ using CardGameManagement.Api.Configuration;
 using CardGameManagement.Api.Configuration.Routes;
 using CardGameManagement.Data;
 using CardGameManagement.Domain.Entities;
+using IdempotentAPI.Cache.DistributedCache.Extensions.DependencyInjection;
+using IdempotentAPI.Core;
+using IdempotentAPI.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -23,6 +26,9 @@ var rateLimitOptions = new CardGameRateLimitOptions();
 builder.Configuration.GetSection(CardGameRateLimitOptions.CardGameRateLimit).Bind(rateLimitOptions);
 var slidingPolicy = "sliding";
 
+builder.Services.AddIdempotentMinimalAPI(new IdempotencyOptions());
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddIdempotentAPIUsingDistributedCache();
 
 builder.Services.AddRateLimiter(options => {
     options.AddSlidingWindowLimiter(slidingPolicy, op =>

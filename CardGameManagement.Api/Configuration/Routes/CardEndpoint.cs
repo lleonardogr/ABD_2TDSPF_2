@@ -1,6 +1,7 @@
 using CardGameManagement.Api.Models;
 using CardGameManagement.Api.Services;
 using CardGameManagement.Domain.Entities;
+using IdempotentAPI.MinimalAPI;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace CardGameManagement.Api.Configuration.Routes;
@@ -65,6 +66,7 @@ public static class CardEndpoint
 
         cardGroup.MapPost("/", (CardAddOrUpdateModel model) => { cards.Add(model.MapToCard()); })
             .Accepts<Card>("application/json")
+            .AddEndpointFilter<IdempotentAPIEndpointFilter>()
             .WithName("Add card")
             .WithOpenApi();
 
