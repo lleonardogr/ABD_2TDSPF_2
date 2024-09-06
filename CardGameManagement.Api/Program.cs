@@ -1,11 +1,14 @@
 using System.Threading.RateLimiting;
 using CardGameManagement.Api.Configuration;
+using CardGameManagement.Api.Configuration.HealthChecks;
 using CardGameManagement.Api.Configuration.Routes;
 using CardGameManagement.Data;
 using CardGameManagement.Domain.Entities;
+using HealthChecks.UI.Client;
 using IdempotentAPI.Cache.DistributedCache.Extensions.DependencyInjection;
 using IdempotentAPI.Core;
 using IdempotentAPI.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -18,6 +21,9 @@ builder.Services.AddDbContext<CardGameMetadataDbContext>(options =>
 {
     options.UseOracle(builder.Configuration.GetConnectionString("FiapOracleConnection"));
 });
+
+
+builder.Services.ConfigureHealthChecks(builder.Configuration);
 
 builder.Services.Configure<CardGameRateLimitOptions>(
     builder.Configuration.GetSection(CardGameRateLimitOptions.CardGameRateLimit));
@@ -78,6 +84,18 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapGet("/test", () => "Hello World!").RequireRateLimiting(slidingPolicy);//.ExcludeFromDescription();
+
+app.MapHealthChecks("/api/health", new HealthCheckOptions()
+{
+    Predicate = _ => true,
+    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+});
+app.UseHealthChecksUI(options =>
+{
+    options.UIPath = "/healthcheck-ui";
+    
+});
+
 app.MapCardEndpoints();
 
 app.MapGet("/Set", async (CardGameMetadataDbContext dbContext) =>
@@ -85,5 +103,6 @@ app.MapGet("/Set", async (CardGameMetadataDbContext dbContext) =>
     var sets = await dbContext.Sets.ToListAsync();
     return Results.Ok(sets);
 }).Produces<List<Set>>(StatusCodes.Status200OK);
+
 
 app.Run();
