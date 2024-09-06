@@ -64,7 +64,11 @@ public static class CardEndpoint
 
         #region Commands
 
-        cardGroup.MapPost("/", (CardAddOrUpdateModel model) => { cards.Add(model.MapToCard()); })
+        cardGroup.MapPost("/", (CardAddOrUpdateModel model) =>
+            {
+                cards.Add(model.MapToCard());
+                return Results.Created("/cards", cards);
+            })
             .Accepts<Card>("application/json")
             .AddEndpointFilter<IdempotentAPIEndpointFilter>()
             .WithName("Add card")
