@@ -1,7 +1,10 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Text;
 using System.Threading.RateLimiting;
 using CardGameManagement.Api.Configuration;
 using CardGameManagement.Api.Configuration.HealthChecks;
 using CardGameManagement.Api.Configuration.Routes;
+using CardGameManagement.Api.Models;
 using CardGameManagement.Data;
 using CardGameManagement.Domain.Entities;
 using HealthChecks.UI.Client;
@@ -9,9 +12,11 @@ using IdempotentAPI.Cache.DistributedCache.Extensions.DependencyInjection;
 using IdempotentAPI.Core;
 using IdempotentAPI.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
 // o builder ele tem a responsabilidade de criar a aplicação
@@ -29,7 +34,22 @@ builder.Services.AddDbContext<CardGameMetadataDbContext>(options =>
 
 #region Authentication Configuration
 
+builder.Services.AddAuthentication("Bearer")
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters()
+        {
+            ValidateIssuer = false,
+            ValidateAudience = false,
+            ValidateLifetime = false,
+            ValidateIssuerSigningKey = false,
+            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            ValidAudience = builder.Configuration["Jwt:Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+        };
+    });
 
+builder.Services.AddAuthorization();
 
 #endregion
 
@@ -91,6 +111,29 @@ builder.Services.AddSwaggerGen(options =>
                 Url = new Uri("https://example.com/license")
             }
      });
+     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme()
+     {
+         Name = "Authorization",
+         Type = SecuritySchemeType.ApiKey,
+         Scheme = "Bearer",
+         BearerFormat = "JWT",
+         In = ParameterLocation.Header,
+         Description = "JWT Authorization header using the Bearer scheme. \r\n\r\n Enter 'Bearer' [space] and then your token in the text input below.\r\n\r\nExample: \"Bearer 12345abcdef\""
+     });
+        options.AddSecurityRequirement(new OpenApiSecurityRequirement
+        {
+            {
+                new OpenApiSecurityScheme
+                {
+                    Reference = new OpenApiReference
+                    {
+                        Type = ReferenceType.SecurityScheme,
+                        Id = "Bearer"
+                    }
+                },
+                new string[] {}
+            }
+        });
 });
 
 #endregion
@@ -109,7 +152,25 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.MapGet("/test", () => "Hello World!").RequireRateLimiting(slidingPolicy);//.ExcludeFromDescription();
+app.MapPost("/authenticate", (JwtAuthModel model) =>
+{
+    //generate token
+    // token handler ele vai gerenciar toda a parte de um token que será gerado
+    var tokenHandler = new JwtSecurityTokenHandler();
+    // key é a chave
+    var key = Encoding.UTF8.GetBytes(model.secretKey);
+    // token descriptor é o que vai ser gerado
+    var tokenDescriptor = new SecurityTokenDescriptor {
+        SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
+    };
+    // token é o token gerado
+    var token = tokenHandler.CreateToken(tokenDescriptor);
+    return Results.Ok(tokenHandler.WriteToken(token));
+});
+
+app.MapGet("/test", () => "Hello World!")
+    .RequireRateLimiting(slidingPolicy)
+    .RequireAuthorization();//.ExcludeFromDescription();
 
 app.MapHealthChecks("/api/health", new HealthCheckOptions()
 {
@@ -130,5 +191,7 @@ app.MapGet("/Set", async (CardGameMetadataDbContext dbContext) =>
     return Results.Ok(sets);
 }).Produces<List<Set>>(StatusCodes.Status200OK);
 
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.Run();

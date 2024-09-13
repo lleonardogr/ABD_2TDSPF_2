@@ -1,6 +1,6 @@
 namespace CardGameManagement.Api.Models;
 
-public class JwtAuth
+public class JwtAuthModel
 {
-    
+    public string secretKey { get; set; }
 }
