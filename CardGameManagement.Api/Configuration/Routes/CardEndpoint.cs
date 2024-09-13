@@ -30,8 +30,7 @@ public static class CardEndpoint
                 Description = "Retorna todos os cards",
                 Deprecated = true
             })
-            .Produces<List<Card>>()
-            .ExcludeFromDescription();
+            .Produces<List<Card>>();
 
         cardGroup.MapGet("/search", (int page, int pagesize) =>
         {

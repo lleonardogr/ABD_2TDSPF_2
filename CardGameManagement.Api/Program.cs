@@ -17,13 +17,29 @@ using Microsoft.OpenApi.Models;
 // o builder ele tem a responsabilidade de criar a aplicação
 var builder = WebApplication.CreateBuilder(args);
 
+//TODO: Passar as regions para arquivos separados
+#region  Database Services Configuration
+
 builder.Services.AddDbContext<CardGameMetadataDbContext>(options =>
 {
     options.UseOracle(builder.Configuration.GetConnectionString("FiapOracleConnection"));
 });
 
+#endregion
+
+#region Authentication Configuration
+
+
+
+#endregion
+
+#region HealthChecks Configuration
 
 builder.Services.ConfigureHealthChecks(builder.Configuration);
+
+#endregion
+
+#region RateLimiting Configuration
 
 builder.Services.Configure<CardGameRateLimitOptions>(
     builder.Configuration.GetSection(CardGameRateLimitOptions.CardGameRateLimit));
@@ -31,10 +47,6 @@ builder.Services.Configure<CardGameRateLimitOptions>(
 var rateLimitOptions = new CardGameRateLimitOptions();
 builder.Configuration.GetSection(CardGameRateLimitOptions.CardGameRateLimit).Bind(rateLimitOptions);
 var slidingPolicy = "sliding";
-
-builder.Services.AddIdempotentMinimalAPI(new IdempotencyOptions());
-builder.Services.AddDistributedMemoryCache();
-builder.Services.AddIdempotentAPIUsingDistributedCache();
 
 builder.Services.AddRateLimiter(options => {
     options.AddSlidingWindowLimiter(slidingPolicy, op =>
@@ -46,6 +58,18 @@ builder.Services.AddRateLimiter(options => {
         op.QueueLimit = rateLimitOptions.QueueLimit;
     });
 });
+
+#endregion
+
+#region Idempotency Configuration
+
+builder.Services.AddIdempotentMinimalAPI(new IdempotencyOptions());
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddIdempotentAPIUsingDistributedCache();
+
+#endregion
+
+#region Swagger Configuration
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -68,6 +92,8 @@ builder.Services.AddSwaggerGen(options =>
             }
      });
 });
+
+#endregion
 
 // o app é a aplicação em si, ele compila o builder, define o ambiente e as rotas
 var app = builder.Build();
